@@ -80,7 +80,7 @@ export function matchDonors(donors: Donor[], filters: MatchFilters): DonorMatch[
         score: scoreDonor(donor, distanceKm, eligibility, radiusKm),
         reasons,
         isBestMatch: false,
-      } satisfies DonorMatch;
+      } as DonorMatch;
     })
     // Incompatible donors are never valid matches.
     .filter((m) => m.compatible)
@@ -91,10 +91,9 @@ export function matchDonors(donors: Donor[], filters: MatchFilters): DonorMatch[
     .filter((m) => (onlyVerified ? m.donor.verified : true));
 
   matches.sort((a, b) => (sort === "nearest" ? a.distanceKm - b.distanceKm : b.score - a.score));
-  if (matches.length) {
-    const best = matches.reduce((acc, m) => (m.score > acc.score ? m : acc), matches[0]);
-    best.isBestMatch = true;
-  }
+  let best: DonorMatch | undefined;
+  for (const m of matches) if (!best || m.score > best.score) best = m;
+  if (best) best.isBestMatch = true;
   return matches;
 }
 
