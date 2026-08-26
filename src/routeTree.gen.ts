@@ -10,11 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FindDonorsRouteImport } from './routes/find-donors'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MapRouteImport } from './routes/map'
+import { Route as RegisterRouteImport } from './routes/register'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FindDonorsRoute = FindDonorsRouteImport.update({
+  id: '/find-donors',
+  path: '/find-donors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HowItWorksRoute = HowItWorksRouteImport.update({
@@ -22,31 +31,70 @@ const HowItWorksRoute = HowItWorksRouteImport.update({
   path: '/how-it-works',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapRoute = MapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/find-donors': typeof FindDonorsRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/login': typeof LoginRoute
+  '/map': typeof MapRoute
+  '/register': typeof RegisterRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/find-donors': typeof FindDonorsRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/login': typeof LoginRoute
+  '/map': typeof MapRoute
+  '/register': typeof RegisterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/find-donors': typeof FindDonorsRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/login': typeof LoginRoute
+  '/map': typeof MapRoute
+  '/register': typeof RegisterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/how-it-works'
+  fullPaths:
+    '/' | '/find-donors' | '/how-it-works' | '/login' | '/map' | '/register'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/how-it-works'
-  id: '__root__' | '/' | '/how-it-works'
+  to: '/' | '/find-donors' | '/how-it-works' | '/login' | '/map' | '/register'
+  id:
+    | '__root__'
+    | '/'
+    | '/find-donors'
+    | '/how-it-works'
+    | '/login'
+    | '/map'
+    | '/register'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FindDonorsRoute: typeof FindDonorsRoute
   HowItWorksRoute: typeof HowItWorksRoute
+  LoginRoute: typeof LoginRoute
+  MapRoute: typeof MapRoute
+  RegisterRoute: typeof RegisterRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +106,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/find-donors': {
+      id: '/find-donors'
+      path: '/find-donors'
+      fullPath: '/find-donors'
+      preLoaderRoute: typeof FindDonorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/how-it-works': {
       id: '/how-it-works'
       path: '/how-it-works'
@@ -65,12 +120,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HowItWorksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/map': {
+      id: '/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FindDonorsRoute: FindDonorsRoute,
   HowItWorksRoute: HowItWorksRoute,
+  LoginRoute: LoginRoute,
+  MapRoute: MapRoute,
+  RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
