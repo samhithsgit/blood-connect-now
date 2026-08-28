@@ -16,6 +16,7 @@ import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RequestIdRouteImport } from './routes/request.$id'
 import { Route as RequestNewRouteImport } from './routes/request.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,6 +54,11 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RequestIdRoute = RequestIdRouteImport.update({
+  id: '/request/$id',
+  path: '/request/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RequestNewRoute = RequestNewRouteImport.update({
   id: '/request/new',
   path: '/request/new',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
   '/register': typeof RegisterRoute
+  '/request/$id': typeof RequestIdRoute
   '/request/new': typeof RequestNewRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
   '/register': typeof RegisterRoute
+  '/request/$id': typeof RequestIdRoute
   '/request/new': typeof RequestNewRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
   '/register': typeof RegisterRoute
+  '/request/$id': typeof RequestIdRoute
   '/request/new': typeof RequestNewRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/map'
     | '/register'
+    | '/request/$id'
     | '/request/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/map'
     | '/register'
+    | '/request/$id'
     | '/request/new'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/map'
     | '/register'
+    | '/request/$id'
     | '/request/new'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MapRoute: typeof MapRoute
   RegisterRoute: typeof RegisterRoute
+  RequestIdRoute: typeof RequestIdRoute
   RequestNewRoute: typeof RequestNewRoute
 }
 
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/request/$id': {
+      id: '/request/$id'
+      path: '/request/$id'
+      fullPath: '/request/$id'
+      preLoaderRoute: typeof RequestIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/request/new': {
       id: '/request/new'
       path: '/request/new'
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MapRoute: MapRoute,
   RegisterRoute: RegisterRoute,
+  RequestIdRoute: RequestIdRoute,
   RequestNewRoute: RequestNewRoute,
 }
 export const routeTree = rootRouteImport
