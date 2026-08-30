@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FindDonorsRouteImport } from './routes/find-donors'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RequestIdRouteImport } from './routes/request.$id'
 import { Route as RequestNewRouteImport } from './routes/request.new'
@@ -34,6 +36,11 @@ const FindDonorsRoute = FindDonorsRouteImport.update({
   path: '/find-donors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HowItWorksRoute = HowItWorksRouteImport.update({
   id: '/how-it-works',
   path: '/how-it-works',
@@ -47,6 +54,11 @@ const LoginRoute = LoginRouteImport.update({
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -69,9 +81,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/find-donors': typeof FindDonorsRoute
+  '/history': typeof HistoryRoute
   '/how-it-works': typeof HowItWorksRoute
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/request/$id': typeof RequestIdRoute
   '/request/new': typeof RequestNewRoute
@@ -80,9 +94,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/find-donors': typeof FindDonorsRoute
+  '/history': typeof HistoryRoute
   '/how-it-works': typeof HowItWorksRoute
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/request/$id': typeof RequestIdRoute
   '/request/new': typeof RequestNewRoute
@@ -92,9 +108,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/find-donors': typeof FindDonorsRoute
+  '/history': typeof HistoryRoute
   '/how-it-works': typeof HowItWorksRoute
   '/login': typeof LoginRoute
   '/map': typeof MapRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/request/$id': typeof RequestIdRoute
   '/request/new': typeof RequestNewRoute
@@ -105,9 +123,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/find-donors'
+    | '/history'
     | '/how-it-works'
     | '/login'
     | '/map'
+    | '/profile'
     | '/register'
     | '/request/$id'
     | '/request/new'
@@ -116,9 +136,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/find-donors'
+    | '/history'
     | '/how-it-works'
     | '/login'
     | '/map'
+    | '/profile'
     | '/register'
     | '/request/$id'
     | '/request/new'
@@ -127,9 +149,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/find-donors'
+    | '/history'
     | '/how-it-works'
     | '/login'
     | '/map'
+    | '/profile'
     | '/register'
     | '/request/$id'
     | '/request/new'
@@ -139,9 +163,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   FindDonorsRoute: typeof FindDonorsRoute
+  HistoryRoute: typeof HistoryRoute
   HowItWorksRoute: typeof HowItWorksRoute
   LoginRoute: typeof LoginRoute
   MapRoute: typeof MapRoute
+  ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   RequestIdRoute: typeof RequestIdRoute
   RequestNewRoute: typeof RequestNewRoute
@@ -170,6 +196,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FindDonorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/how-it-works': {
       id: '/how-it-works'
       path: '/how-it-works'
@@ -189,6 +222,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -219,9 +259,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   FindDonorsRoute: FindDonorsRoute,
+  HistoryRoute: HistoryRoute,
   HowItWorksRoute: HowItWorksRoute,
   LoginRoute: LoginRoute,
   MapRoute: MapRoute,
+  ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   RequestIdRoute: RequestIdRoute,
   RequestNewRoute: RequestNewRoute,
