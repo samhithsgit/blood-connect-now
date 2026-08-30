@@ -170,7 +170,7 @@ function FindDonors() {
                 <DonorCard
                   key={m.donor.id}
                   match={m}
-                  className={selected === m.donor.id ? "ring-2 ring-ring" : undefined}
+                  {...(selected === m.donor.id ? { className: "ring-2 ring-ring" } : {})}
                 />
               ))}
             </div>
