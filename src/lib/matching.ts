@@ -100,6 +100,7 @@ export function matchDonors(donors: Donor[], filters: MatchFilters): DonorMatch[
     onlyAvailable,
     onlyEligible,
     onlyVerified,
+    urgency,
     sort = "best",
   } = filters;
 
