@@ -104,28 +104,46 @@ export function matchDonors(donors: Donor[], filters: MatchFilters): DonorMatch[
   } = filters;
 
   const matches = donors
-    .map((donor) => {
+    .map((donor): DonorMatch => {
       const distanceKm = Math.round(haversineKm(origin, { lat: donor.lat, lng: donor.lng }) * 10) / 10;
       const eligibility = evaluateEligibility({
         lastDonationDate: donor.lastDonationDate,
         available: donor.available,
       });
       const compatible = canDonate(donor.bloodGroup, recipientGroup);
+      const breakdown = scoreDonor(donor, distanceKm, eligibility, radiusKm);
+
       const reasons: string[] = [];
       if (compatible) reasons.push("Compatible");
       if (eligibility.status === "eligible") reasons.push("Eligible");
       if (donor.available) reasons.push("Available");
       reasons.push(formatDistance(distanceKm));
+
+      const why: string[] = [];
+      if (compatible) why.push(`Compatible blood group (${donor.bloodGroup} → ${recipientGroup})`);
+      if (eligibility.status === "eligible") why.push("Eligible to donate");
+      else if (eligibility.status === "recently-donated") why.push(eligibility.detail);
+      if (donor.available) why.push("Available now");
+      why.push(`${formatDistance(distanceKm)} from the hospital`);
+      if (donor.verified) why.push("Verified donor");
+      if (donor.donations > 0) why.push(`${donor.donations} previous donation${donor.donations === 1 ? "" : "s"}`);
+      if (urgency === "critical" && donor.avgResponseMinutes <= 30) {
+        why.push("Fast responder — suitable for current urgency");
+      }
+
       return {
         donor,
         distanceKm,
         distanceLabel: formatDistance(distanceKm),
         compatible,
         eligibility,
-        score: scoreDonor(donor, distanceKm, eligibility, radiusKm),
+        score: breakdownTotal(breakdown),
+        breakdown,
         reasons,
+        why,
+        primaryReason: primaryReason(breakdown),
         isBestMatch: false,
-      } as DonorMatch;
+      };
     })
     // Incompatible donors are never valid matches.
     .filter((m) => m.compatible)
