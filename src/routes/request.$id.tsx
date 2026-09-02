@@ -1,16 +1,24 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, MapPin, Send } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, Info, MapPin, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader, EmptyState } from "@/components/bb/page";
 import { RequireAuth } from "@/components/bb/require-auth";
 import { DonorCard } from "@/components/bb/donor-card";
-import { BloodTag, Chip, StatusChip, UrgencyChip, REQUEST_STATUS_LABEL } from "@/components/bb/badges";
+import {
+  AvailabilityChip,
+  BloodTag,
+  Chip,
+  EligibilityChip,
+  StatusChip,
+  UrgencyChip,
+  REQUEST_STATUS_LABEL,
+} from "@/components/bb/badges";
 import { RADIUS_OPTIONS } from "@/lib/blood";
 import type { RequestStatus } from "@/lib/demo-data";
-import { matchDonors } from "@/lib/matching";
+import { matchDonors, MATCH_WEIGHTS, type DonorMatch } from "@/lib/matching";
 import {
   acceptRequest,
   inviteDonor,
@@ -68,6 +76,7 @@ function RequestDetail() {
             recipientGroup: request.bloodGroup,
             origin: { lat: request.lat, lng: request.lng },
             radiusKm: radius,
+            urgency: request.urgency,
             sort: "best",
           })
         : [],
@@ -215,6 +224,8 @@ function RequestDetail() {
             )}
           </Card>
 
+          <SmartMatchEngine matches={matches} radiusKm={radius} />
+
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-2xl">Compatible donors</h2>
@@ -299,6 +310,137 @@ function RequestDetail() {
           )}
         </Card>
       </div>
+    </div>
+  );
+}
+
+function SmartMatchEngine({ matches, radiusKm }: { matches: DonorMatch[]; radiusKm: number }) {
+  const [whyOpen, setWhyOpen] = useState(false);
+  const ready = matches.filter((m) => m.donor.available && m.eligibility.status === "eligible");
+  const best = matches.find((m) => m.isBestMatch);
+  const runnersUp = matches.filter((m) => m !== best).slice(0, 4);
+
+  return (
+    <Card className="gap-5 border-primary/30 p-6 shadow-soft ring-1 ring-primary/15">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-display text-2xl">
+          <Sparkles className="h-5 w-5 text-primary" aria-hidden />
+          Smart Match Engine
+        </h2>
+        <Chip tone="neutral">Deterministic · rule-based</Chip>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <EngineStat label="Compatible donors" value={String(matches.length)} />
+        <EngineStat label="Eligible & available" value={String(ready.length)} />
+        <EngineStat label="Search radius" value={`${radiusKm} km`} />
+      </div>
+
+      {best ? (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <BloodTag group={best.donor.bloodGroup} />
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-primary">
+                  Best match
+                </p>
+                <p className="text-lg font-bold">{best.donor.name}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" aria-hidden />
+                  {best.donor.area} · {best.distanceLabel}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="font-display text-3xl text-primary">{Math.round(best.score)}%</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Match</p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <EligibilityChip status={best.eligibility.status} label={best.eligibility.label} />
+            <AvailabilityChip available={best.donor.available} />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setWhyOpen((v) => !v)}
+            className="mt-3 flex items-center gap-1 text-sm font-semibold text-primary"
+            aria-expanded={whyOpen}
+          >
+            Why this donor?
+            <ChevronDown
+              className={whyOpen ? "h-4 w-4 rotate-180 transition-transform" : "h-4 w-4 transition-transform"}
+              aria-hidden
+            />
+          </button>
+          {whyOpen && (
+            <ul className="mt-2 space-y-1.5 rounded-lg bg-background/70 p-3 text-sm">
+              {best.why.map((w) => (
+                <li key={w} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  {w}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <p className="rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+          No compatible donors in this radius yet — widen the radius below to re-rank.
+        </p>
+      )}
+
+      {runnersUp.length > 0 && (
+        <ol className="space-y-2">
+          {runnersUp.map((m, i) => (
+            <li
+              key={m.donor.id}
+              className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold">
+                {i + 2}
+              </span>
+              <BloodTag group={m.donor.bloodGroup} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{m.donor.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {m.distanceLabel} · {m.primaryReason}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <EligibilityChip status={m.eligibility.status} label={m.eligibility.label} />
+                <AvailabilityChip available={m.donor.available} />
+                <Chip tone="neutral">{Math.round(m.score)}%</Chip>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <div className="rounded-lg bg-muted/60 p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold">
+          <Info className="h-4 w-4 text-primary" aria-hidden />
+          How matching works
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          BloodBridge ranks donors with a transparent, deterministic score — no black-box AI.
+          Blood compatibility ({MATCH_WEIGHTS.compatibility}%) is a strict rule-based gate,
+          then we add proximity ({MATCH_WEIGHTS.proximity}%), current availability (
+          {MATCH_WEIGHTS.availability}%) and donation eligibility ({MATCH_WEIGHTS.eligibility}%).
+          Scores are indicative only and are not medically validated or clinically predictive.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+function EngineStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-muted/60 p-3 text-center">
+      <p className="font-display text-2xl">{value}</p>
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
     </div>
   );
 }
