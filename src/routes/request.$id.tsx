@@ -224,6 +224,8 @@ function RequestDetail() {
             )}
           </Card>
 
+          <SmartMatchEngine matches={matches} radiusKm={radius} />
+
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-2xl">Compatible donors</h2>
