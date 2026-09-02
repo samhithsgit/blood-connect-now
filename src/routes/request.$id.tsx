@@ -66,6 +66,7 @@ function RequestDetail() {
   const donors = useDonors();
   const invites = useInvites();
   const [radius, setRadius] = useState<number>(10);
+  const [whyOpen, setWhyOpen] = useState(false);
 
   const request = requests.find((r) => r.id.toLowerCase() === id.toLowerCase());
 
@@ -76,6 +77,7 @@ function RequestDetail() {
             recipientGroup: request.bloodGroup,
             origin: { lat: request.lat, lng: request.lng },
             radiusKm: radius,
+            urgency: request.urgency,
             sort: "best",
           })
         : [],
