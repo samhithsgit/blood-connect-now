@@ -1,16 +1,24 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, MapPin, Send } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, Info, MapPin, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader, EmptyState } from "@/components/bb/page";
 import { RequireAuth } from "@/components/bb/require-auth";
 import { DonorCard } from "@/components/bb/donor-card";
-import { BloodTag, Chip, StatusChip, UrgencyChip, REQUEST_STATUS_LABEL } from "@/components/bb/badges";
+import {
+  AvailabilityChip,
+  BloodTag,
+  Chip,
+  EligibilityChip,
+  StatusChip,
+  UrgencyChip,
+  REQUEST_STATUS_LABEL,
+} from "@/components/bb/badges";
 import { RADIUS_OPTIONS } from "@/lib/blood";
 import type { RequestStatus } from "@/lib/demo-data";
-import { matchDonors } from "@/lib/matching";
+import { matchDonors, MATCH_WEIGHTS, type DonorMatch } from "@/lib/matching";
 import {
   acceptRequest,
   inviteDonor,
