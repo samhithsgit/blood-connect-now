@@ -298,6 +298,11 @@ export function inviteDonor(requestId: string, donorId: string) {
 export function acceptRequest(requestId: string, donorId: string) {
   setState((s) => ({
     ...s,
+    alerts: s.alerts.map((a) =>
+      a.requestId === requestId && a.donorId === donorId && a.response === "pending"
+        ? { ...a, response: "accepted", respondedAt: new Date().toISOString() }
+        : a,
+    ),
     requests: s.requests.map((r) =>
       r.id === requestId
         ? {
@@ -309,6 +314,103 @@ export function acceptRequest(requestId: string, donorId: string) {
     ),
   }));
 }
+
+/* ----------------------------- emergency alerts ---------------------------- */
+
+export interface EmergencyAlertInput {
+  donorId: string;
+  score: number;
+  distanceKm: number;
+  distanceLabel: string;
+  why: string[];
+  primaryReason: string;
+}
+
+/**
+ * Creates local/demo emergency alerts from Smart Match Engine results.
+ * Donors already alerted for this request are skipped. Returns created count.
+ */
+export function createEmergencyAlerts(requestId: string, inputs: EmergencyAlertInput[]): number {
+  const existing = new Set(
+    state.alerts.filter((a) => a.requestId === requestId).map((a) => a.donorId),
+  );
+  const fresh = inputs.filter((i) => !existing.has(i.donorId));
+  if (fresh.length === 0) return 0;
+  const now = new Date().toISOString();
+  const created: EmergencyAlert[] = fresh.map((i) => ({
+    id: `al-${requestId}-${i.donorId}`,
+    requestId,
+    donorId: i.donorId,
+    createdAt: now,
+    response: "pending",
+    respondedAt: null,
+    score: i.score,
+    distanceKm: i.distanceKm,
+    distanceLabel: i.distanceLabel,
+    why: i.why,
+    primaryReason: i.primaryReason,
+  }));
+  setState((s) => ({
+    ...s,
+    alerts: [...created, ...s.alerts],
+    requests: s.requests.map((r) =>
+      r.id === requestId
+        ? {
+            ...r,
+            status: r.status === "searching" ? "notified" : r.status,
+            notifiedDonorIds: Array.from(
+              new Set([...r.notifiedDonorIds, ...created.map((c) => c.donorId)]),
+            ),
+          }
+        : r,
+    ),
+  }));
+  return created.length;
+}
+
+/** Donor accept/decline. Returns false when the alert is missing or already answered. */
+export function respondToAlert(alertId: string, response: "accepted" | "declined"): boolean {
+  const alert = state.alerts.find((a) => a.id === alertId);
+  if (!alert || alert.response !== "pending") return false;
+  const request = state.requests.find((r) => r.id === alert.requestId);
+  if (!request || request.status === "cancelled") return false;
+  const now = new Date().toISOString();
+  setState((s) => ({
+    ...s,
+    alerts: s.alerts.map((a) => (a.id === alertId ? { ...a, response, respondedAt: now } : a)),
+    requests:
+      response === "accepted"
+        ? s.requests.map((r) =>
+            r.id === alert.requestId
+              ? {
+                  ...r,
+                  status: r.status === "fulfilled" ? r.status : "accepted",
+                  acceptedDonorIds: Array.from(new Set([...r.acceptedDonorIds, alert.donorId])),
+                }
+              : r,
+          )
+        : s.requests,
+  }));
+  return true;
+}
+
+export interface AlertSummary {
+  alerted: number;
+  accepted: number;
+  pending: number;
+  declined: number;
+}
+
+export function summarizeAlerts(alerts: EmergencyAlert[], requestId: string): AlertSummary {
+  const scoped = alerts.filter((a) => a.requestId === requestId);
+  return {
+    alerted: scoped.length,
+    accepted: scoped.filter((a) => a.response === "accepted").length,
+    pending: scoped.filter((a) => a.response === "pending").length,
+    declined: scoped.filter((a) => a.response === "declined").length,
+  };
+}
+
 
 export function setRequestStatus(requestId: string, status: RequestStatus) {
   setState((s) => ({
