@@ -108,14 +108,39 @@ function RequestDetail() {
   const invited = invites[request.id] ?? [];
   const stageIndex = TIMELINE.indexOf(request.status);
 
-  function handleNotifyAll() {
-    const ids = matches.filter((m) => m.donor.available).map((m) => m.donor.id);
-    if (ids.length === 0) {
-      toast.error("No compatible, available donors in this radius");
-      return;
+  /** Alert candidates come straight from the Smart Match Engine ranking. */
+  const alertCandidates = matches.filter(
+    (m) => m.donor.available && m.eligibility.status === "eligible",
+  );
+  const requestAlerts = alerts.filter((a) => a.requestId === request.id);
+  const summary = summarizeAlerts(alerts, request.id);
+  const alreadyAlerted = new Set(requestAlerts.map((a) => a.donorId));
+  const newCandidates = alertCandidates.filter((m) => !alreadyAlerted.has(m.donor.id));
+
+  function handleConfirmAlerts() {
+    try {
+      const created = createEmergencyAlerts(
+        request!.id,
+        newCandidates.map((m) => ({
+          donorId: m.donor.id,
+          score: Math.round(m.score),
+          distanceKm: m.distanceKm,
+          distanceLabel: m.distanceLabel,
+          why: m.why,
+          primaryReason: m.primaryReason,
+        })),
+      );
+      setConfirmOpen(false);
+      if (created === 0) {
+        toast.info("All matched donors have already been alerted");
+        return;
+      }
+      toast.success(`${created} compatible donor${created === 1 ? "" : "s"} alerted`, {
+        description: "Demo alerts appear on donor dashboards — no SMS or push is sent.",
+      });
+    } catch {
+      toast.error("Could not create emergency alerts. Please try again.");
     }
-    notifyDonors(request!.id, ids);
-    toast.success(`Notified ${ids.length} compatible donor${ids.length === 1 ? "" : "s"}`);
   }
 
   return (
@@ -128,9 +153,10 @@ function RequestDetail() {
           <>
             {isOwner && !closed && (
               <>
-                <Button onClick={handleNotifyAll}>
+                <Button onClick={() => setConfirmOpen(true)}>
                   <Send className="h-4 w-4" aria-hidden /> Notify compatible donors
                 </Button>
+
                 <Button
                   variant="outline"
                   onClick={() => {
