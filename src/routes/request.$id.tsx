@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronDown, Clock, Info, MapPin, Send, Sparkles } from "lucide-react";
+import { BellRing, CheckCircle2, ChevronDown, Clock, Info, MapPin, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader, EmptyState } from "@/components/bb/page";
@@ -21,14 +21,25 @@ import type { RequestStatus } from "@/lib/demo-data";
 import { matchDonors, MATCH_WEIGHTS, type DonorMatch } from "@/lib/matching";
 import {
   acceptRequest,
+  createEmergencyAlerts,
   inviteDonor,
-  notifyDonors,
   setRequestStatus,
+  summarizeAlerts,
+  useAlerts,
   useDonors,
   useInvites,
   useRequests,
   useUser,
 } from "@/lib/store";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 
 export const Route = createFileRoute("/request/$id")({
   head: () => ({
@@ -66,6 +77,9 @@ function RequestDetail() {
   const donors = useDonors();
   const invites = useInvites();
   const [radius, setRadius] = useState<number>(10);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const alerts = useAlerts();
+
 
   const request = requests.find((r) => r.id.toLowerCase() === id.toLowerCase());
 
@@ -108,14 +122,39 @@ function RequestDetail() {
   const invited = invites[request.id] ?? [];
   const stageIndex = TIMELINE.indexOf(request.status);
 
-  function handleNotifyAll() {
-    const ids = matches.filter((m) => m.donor.available).map((m) => m.donor.id);
-    if (ids.length === 0) {
-      toast.error("No compatible, available donors in this radius");
-      return;
+  /** Alert candidates come straight from the Smart Match Engine ranking. */
+  const alertCandidates = matches.filter(
+    (m) => m.donor.available && m.eligibility.status === "eligible",
+  );
+  const requestAlerts = alerts.filter((a) => a.requestId === request.id);
+  const summary = summarizeAlerts(alerts, request.id);
+  const alreadyAlerted = new Set(requestAlerts.map((a) => a.donorId));
+  const newCandidates = alertCandidates.filter((m) => !alreadyAlerted.has(m.donor.id));
+
+  function handleConfirmAlerts() {
+    try {
+      const created = createEmergencyAlerts(
+        request!.id,
+        newCandidates.map((m) => ({
+          donorId: m.donor.id,
+          score: Math.round(m.score),
+          distanceKm: m.distanceKm,
+          distanceLabel: m.distanceLabel,
+          why: m.why,
+          primaryReason: m.primaryReason,
+        })),
+      );
+      setConfirmOpen(false);
+      if (created === 0) {
+        toast.info("All matched donors have already been alerted");
+        return;
+      }
+      toast.success(`${created} compatible donor${created === 1 ? "" : "s"} alerted`, {
+        description: "Demo alerts appear on donor dashboards — no SMS or push is sent.",
+      });
+    } catch {
+      toast.error("Could not create emergency alerts. Please try again.");
     }
-    notifyDonors(request!.id, ids);
-    toast.success(`Notified ${ids.length} compatible donor${ids.length === 1 ? "" : "s"}`);
   }
 
   return (
@@ -128,9 +167,10 @@ function RequestDetail() {
           <>
             {isOwner && !closed && (
               <>
-                <Button onClick={handleNotifyAll}>
+                <Button onClick={() => setConfirmOpen(true)}>
                   <Send className="h-4 w-4" aria-hidden /> Notify compatible donors
                 </Button>
+
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -224,7 +264,62 @@ function RequestDetail() {
             )}
           </Card>
 
+          <Card className="gap-4 p-6 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 font-display text-2xl">
+                <BellRing className="h-5 w-5 text-primary" aria-hidden />
+                Emergency alert responses
+              </h2>
+              <Chip tone="neutral">Demo alerts · in-app only</Chip>
+            </div>
+            {summary.alerted === 0 ? (
+              <p className="rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+                No donors alerted yet.{" "}
+                {isOwner && !closed
+                  ? "Use “Notify compatible donors” to alert the highest-ranked matches."
+                  : "The requester has not sent emergency alerts for this request."}
+              </p>
+            ) : (
+              <>
+                <p className="text-sm font-semibold">
+                  {summary.alerted} Alerted · {summary.accepted} Accepted · {summary.pending} Pending ·{" "}
+                  {summary.declined} Declined
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <EngineStat label="Alerted" value={String(summary.alerted)} />
+                  <EngineStat label="Accepted" value={String(summary.accepted)} />
+                  <EngineStat label="Pending" value={String(summary.pending)} />
+                  <EngineStat label="Declined" value={String(summary.declined)} />
+                </div>
+                <ul className="space-y-2">
+                  {requestAlerts.map((a) => {
+                    const donor = donors.find((d) => d.id === a.donorId);
+                    if (!donor) return null;
+                    return (
+                      <li
+                        key={a.id}
+                        className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3"
+                      >
+                        <BloodTag group={donor.bloodGroup} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{donor.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.distanceLabel} · Match {a.score}/100
+                          </p>
+                        </div>
+                        {a.response === "accepted" && <Chip tone="success">Donor confirmed</Chip>}
+                        {a.response === "declined" && <Chip tone="danger">Declined</Chip>}
+                        {a.response === "pending" && <Chip tone="warning">Awaiting response</Chip>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </Card>
+
           <SmartMatchEngine matches={matches} radiusKm={radius} />
+
 
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -310,7 +405,51 @@ function RequestDetail() {
           )}
         </Card>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Alert compatible donors</DialogTitle>
+            <DialogDescription>
+              BloodBridge will alert the highest-ranked compatible donors from the Smart Match
+              Engine. These are in-app demo alerts — no SMS, push or email is sent.
+            </DialogDescription>
+          </DialogHeader>
+
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <Detail label="Request ID" value={request.id} />
+            <Detail label="Blood group" value={request.bloodGroup} />
+            <Detail label="Units required" value={String(request.units)} />
+            <Detail label="Urgency" value={request.urgency} />
+            <Detail label="Location" value={`${request.hospital}, ${request.area}`} />
+            <Detail label="Search radius" value={`${radius} km`} />
+          </dl>
+
+          <div className="grid grid-cols-2 gap-3">
+            <EngineStat label="Compatible donors" value={String(matches.length)} />
+            <EngineStat label="Eligible & available" value={String(alertCandidates.length)} />
+          </div>
+
+          <p className="rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+            {newCandidates.length > 0
+              ? `${newCandidates.length} donor${newCandidates.length === 1 ? "" : "s"} will be alerted now.`
+              : alertCandidates.length > 0
+                ? "Every eligible, available match has already been alerted for this request."
+                : "No eligible, available compatible donors in this radius — widen the radius and try again."}
+          </p>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmAlerts} disabled={newCandidates.length === 0}>
+              <BellRing className="h-4 w-4" aria-hidden /> Confirm &amp; alert donors
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 

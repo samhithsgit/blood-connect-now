@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Activity, MapPin, Plus } from "lucide-react";
+import { Activity, BellRing, CheckCircle2, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,9 @@ import { canDonate, evaluateEligibility, formatDistance, haversineKm } from "@/l
 import type { BloodRequest } from "@/lib/demo-data";
 import {
   acceptRequest,
+  respondToAlert,
   setDonorAvailability,
+  useAlerts,
   useDonors,
   useRequests,
   useUser,
@@ -144,7 +146,10 @@ function DonorDashboard() {
         </Card>
       </div>
 
+      <DonorEmergencyAlerts donorId={donor.id} />
+
       <h2 className="mt-10 font-display text-2xl">Compatible requests near you</h2>
+
       <p className="mb-4 text-sm text-muted-foreground">
         Only requests your blood group can safely serve are shown.
       </p>
@@ -217,7 +222,144 @@ function DonorDashboard() {
   );
 }
 
+/* ----------------------------- emergency alerts --------------------------- */
+
+function DonorEmergencyAlerts({ donorId }: { donorId: string }) {
+  const alerts = useAlerts();
+  const requests = useRequests();
+  const mine = alerts.filter((a) => a.donorId === donorId);
+
+  function respond(alertId: string, response: "accepted" | "declined") {
+    const ok = respondToAlert(alertId, response);
+    if (!ok) {
+      toast.error("This alert can no longer be answered.");
+      return;
+    }
+    if (response === "accepted") {
+      toast.success("You accepted this emergency request", {
+        description: "The requester can now see your contact details.",
+      });
+    } else {
+      toast.info("You declined this emergency request.");
+    }
+  }
+
+  return (
+    <section className="mt-10">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-display text-2xl">
+          <BellRing className="h-5 w-5 text-primary" aria-hidden />
+          Emergency alerts
+        </h2>
+        <Chip tone="neutral">Demo alerts · in-app only</Chip>
+      </div>
+
+      {mine.length === 0 ? (
+        <EmptyState
+          title="No emergency alerts"
+          description="When a hospital or seeker alerts the top-ranked matches for a request you fit, it appears here."
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {mine.map((alert) => {
+            const request = requests.find((r) => r.id === alert.requestId);
+            if (!request) {
+              return (
+                <Card key={alert.id} className="gap-2 p-5 shadow-soft">
+                  <p className="text-sm font-semibold">Request {alert.requestId}</p>
+                  <p className="text-sm text-muted-foreground">
+                    This request is no longer available.
+                  </p>
+                </Card>
+              );
+            }
+            const closed = request.status === "fulfilled" || request.status === "cancelled";
+            return (
+              <Card key={alert.id} className="gap-3 p-5 shadow-soft">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <BloodTag group={request.bloodGroup} />
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold">
+                        Emergency · {request.id}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {request.bloodGroup} needed · {request.units} unit
+                        {request.units === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-display text-2xl text-primary">{alert.score}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      /100 match
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  <UrgencyChip urgency={request.urgency} />
+                  <StatusChip status={request.status} />
+                  <Chip tone="neutral">
+                    <MapPin className="h-3 w-3" aria-hidden />
+                    {request.hospital} · {alert.distanceLabel}
+                  </Chip>
+                </div>
+
+                <div className="rounded-lg bg-muted/60 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Why you&apos;re matched
+                  </p>
+                  <ul className="mt-1.5 space-y-1 text-sm">
+                    {alert.why.map((w) => (
+                      <li key={w} className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                        <span className="min-w-0 break-words">{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {alert.response === "accepted" && <Chip tone="success">You accepted this alert</Chip>}
+                {alert.response === "declined" && (
+                  <Chip tone="danger">You declined this emergency request.</Chip>
+                )}
+                {alert.response === "pending" && closed && (
+                  <Chip tone="neutral">This request is already closed.</Chip>
+                )}
+
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {alert.response === "pending" && !closed && (
+                    <>
+                      <Button size="sm" onClick={() => respond(alert.id, "accepted")}>
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => respond(alert.id, "declined")}
+                      >
+                        Decline
+                      </Button>
+                    </>
+                  )}
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/request/$id" params={{ id: request.id }}>
+                      View details
+                    </Link>
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* --------------------------------- seeker -------------------------------- */
+
 
 function SeekerDashboard() {
   const user = useUser()!;
