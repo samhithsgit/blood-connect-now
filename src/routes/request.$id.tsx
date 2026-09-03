@@ -264,7 +264,62 @@ function RequestDetail() {
             )}
           </Card>
 
+          <Card className="gap-4 p-6 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 font-display text-2xl">
+                <BellRing className="h-5 w-5 text-primary" aria-hidden />
+                Emergency alert responses
+              </h2>
+              <Chip tone="neutral">Demo alerts · in-app only</Chip>
+            </div>
+            {summary.alerted === 0 ? (
+              <p className="rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+                No donors alerted yet.{" "}
+                {isOwner && !closed
+                  ? "Use “Notify compatible donors” to alert the highest-ranked matches."
+                  : "The requester has not sent emergency alerts for this request."}
+              </p>
+            ) : (
+              <>
+                <p className="text-sm font-semibold">
+                  {summary.alerted} Alerted · {summary.accepted} Accepted · {summary.pending} Pending ·{" "}
+                  {summary.declined} Declined
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <EngineStat label="Alerted" value={String(summary.alerted)} />
+                  <EngineStat label="Accepted" value={String(summary.accepted)} />
+                  <EngineStat label="Pending" value={String(summary.pending)} />
+                  <EngineStat label="Declined" value={String(summary.declined)} />
+                </div>
+                <ul className="space-y-2">
+                  {requestAlerts.map((a) => {
+                    const donor = donors.find((d) => d.id === a.donorId);
+                    if (!donor) return null;
+                    return (
+                      <li
+                        key={a.id}
+                        className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3"
+                      >
+                        <BloodTag group={donor.bloodGroup} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{donor.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.distanceLabel} · Match {a.score}/100
+                          </p>
+                        </div>
+                        {a.response === "accepted" && <Chip tone="success">Donor confirmed</Chip>}
+                        {a.response === "declined" && <Chip tone="danger">Declined</Chip>}
+                        {a.response === "pending" && <Chip tone="warning">Awaiting response</Chip>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </Card>
+
           <SmartMatchEngine matches={matches} radiusKm={radius} />
+
 
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
