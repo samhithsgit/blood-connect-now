@@ -405,7 +405,51 @@ function RequestDetail() {
           )}
         </Card>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Alert compatible donors</DialogTitle>
+            <DialogDescription>
+              BloodBridge will alert the highest-ranked compatible donors from the Smart Match
+              Engine. These are in-app demo alerts — no SMS, push or email is sent.
+            </DialogDescription>
+          </DialogHeader>
+
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <Detail label="Request ID" value={request.id} />
+            <Detail label="Blood group" value={request.bloodGroup} />
+            <Detail label="Units required" value={String(request.units)} />
+            <Detail label="Urgency" value={request.urgency} />
+            <Detail label="Location" value={`${request.hospital}, ${request.area}`} />
+            <Detail label="Search radius" value={`${radius} km`} />
+          </dl>
+
+          <div className="grid grid-cols-2 gap-3">
+            <EngineStat label="Compatible donors" value={String(matches.length)} />
+            <EngineStat label="Eligible & available" value={String(alertCandidates.length)} />
+          </div>
+
+          <p className="rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
+            {newCandidates.length > 0
+              ? `${newCandidates.length} donor${newCandidates.length === 1 ? "" : "s"} will be alerted now.`
+              : alertCandidates.length > 0
+                ? "Every eligible, available match has already been alerted for this request."
+                : "No eligible, available compatible donors in this radius — widen the radius and try again."}
+          </p>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmAlerts} disabled={newCandidates.length === 0}>
+              <BellRing className="h-4 w-4" aria-hidden /> Confirm &amp; alert donors
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
