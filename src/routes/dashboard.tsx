@@ -144,7 +144,10 @@ function DonorDashboard() {
         </Card>
       </div>
 
+      <DonorEmergencyAlerts donorId={donor.id} />
+
       <h2 className="mt-10 font-display text-2xl">Compatible requests near you</h2>
+
       <p className="mb-4 text-sm text-muted-foreground">
         Only requests your blood group can safely serve are shown.
       </p>
