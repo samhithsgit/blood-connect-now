@@ -126,6 +126,8 @@ export const useUser = () => useAppState((s) => s.user);
 export const useDonors = () => useAppState((s) => s.donors);
 export const useRequests = () => useAppState((s) => s.requests);
 export const useInvites = () => useAppState((s) => s.invites);
+export const useAlerts = () => useAppState((s) => s.alerts);
+
 
 export function currentUser() {
   return state.user;
