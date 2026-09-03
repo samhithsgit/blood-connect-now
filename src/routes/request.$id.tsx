@@ -77,6 +77,9 @@ function RequestDetail() {
   const donors = useDonors();
   const invites = useInvites();
   const [radius, setRadius] = useState<number>(10);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const alerts = useAlerts();
+
 
   const request = requests.find((r) => r.id.toLowerCase() === id.toLowerCase());
 
