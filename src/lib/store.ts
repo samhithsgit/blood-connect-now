@@ -21,16 +21,39 @@ export interface AppUser {
   donorId?: string;
 }
 
+export type AlertResponse = "pending" | "accepted" | "declined";
+
+/**
+ * A local/demo emergency alert. No real SMS, push or email is ever sent —
+ * these records only drive the in-app donor response workflow.
+ * Match data is a snapshot of the Smart Match Engine result at alert time.
+ */
+export interface EmergencyAlert {
+  id: string;
+  requestId: string;
+  donorId: string;
+  createdAt: string;
+  response: AlertResponse;
+  respondedAt: string | null;
+  /** Smart Match Engine snapshot — never recomputed with another algorithm. */
+  score: number;
+  distanceKm: number;
+  distanceLabel: string;
+  why: string[];
+  primaryReason: string;
+}
+
 interface AppState {
   user: AppUser | null;
   donors: Donor[];
   requests: BloodRequest[];
   /** requestId -> donorIds the seeker has personally invited */
   invites: Record<string, string[]>;
+  alerts: EmergencyAlert[];
   nextRequestNumber: number;
 }
 
-const STORAGE_KEY = "bloodbridge.state.v1";
+const STORAGE_KEY = "bloodbridge.state.v2";
 
 function initialState(): AppState {
   return {
@@ -38,9 +61,11 @@ function initialState(): AppState {
     donors: DEMO_DONORS,
     requests: DEMO_REQUESTS,
     invites: {},
+    alerts: [],
     nextRequestNumber: 1043,
   };
 }
+
 
 let state: AppState = initialState();
 let hydrated = false;
