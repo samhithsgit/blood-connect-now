@@ -231,37 +231,147 @@ function RequestDetail() {
           </Card>
 
           <Card className="gap-4 p-6 shadow-soft">
-            <h2 className="font-display text-2xl">Progress</h2>
-            <ol className="space-y-3">
-              {TIMELINE.map((s, i) => {
-                const done = request.status === "cancelled" ? false : i <= stageIndex;
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-display text-2xl">Emergency tracking</h2>
+              <Chip tone="neutral">Live emergency tracking — prototype simulation</Chip>
+            </div>
+
+            <ol className="space-y-1">
+              {TRACKING_STAGES.map((s) => {
+                const idx = stageIndex(s);
+                const done = request.status !== "cancelled" && idx < currentIndex;
+                const active = request.status !== "cancelled" && idx === currentIndex;
+                const at = track.timestamps[s] ?? (s === "created" ? request.createdAt : undefined);
                 return (
                   <li key={s} className="flex items-start gap-3">
-                    <span
-                      className={
-                        done
-                          ? "mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                          : "mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground"
-                      }
-                    >
-                      {done ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : i + 1}
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold">{REQUEST_STATUS_LABEL[s]}</p>
+                    <div className="flex flex-col items-center self-stretch">
+                      <span
+                        className={
+                          done
+                            ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                            : active
+                              ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-2 ring-primary"
+                              : "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
+                        }
+                      >
+                        {done ? (
+                          <CheckCircle2 className="h-4 w-4" aria-hidden />
+                        ) : (
+                          <span className="h-2 w-2 rounded-full bg-current" aria-hidden />
+                        )}
+                      </span>
+                      {s !== "fulfilled" && (
+                        <span
+                          className={
+                            done ? "w-px flex-1 bg-primary/40" : "w-px flex-1 bg-border"
+                          }
+                          aria-hidden
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0 pb-4">
+                      <p
+                        className={
+                          active
+                            ? "text-sm font-bold text-primary"
+                            : done
+                              ? "text-sm font-semibold"
+                              : "text-sm font-semibold text-muted-foreground"
+                        }
+                      >
+                        {TRACKING_LABEL[s]}
+                        {active && (
+                          <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                            Current
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        {s === "searching" && "Compatible donors are being ranked."}
-                        {s === "notified" && `${request.notifiedDonorIds.length} donor(s) notified.`}
-                        {s === "accepted" && `${request.acceptedDonorIds.length} donor(s) accepted.`}
-                        {s === "fulfilled" && "Transfusion arranged — request closed."}
+                        {at ? `${new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}
+                        {s === "created" && "Emergency request raised."}
+                        {s === "matching" && "Compatible donors ranked by the Smart Match Engine."}
+                        {s === "alerted" &&
+                          (summary.alerted > 0
+                            ? `${summary.alerted} donor(s) alerted.`
+                            : "Awaiting donor alerts.")}
+                        {s === "confirmed" &&
+                          (confirmedDonor
+                            ? `${confirmedDonor.name} accepted.`
+                            : "Waiting for a donor to accept.")}
+                        {s === "en_route" &&
+                          (track.timestamps["en_route"] ? "Donor on the way." : "Waiting for donor.")}
+                        {s === "donation_completed" &&
+                          (track.timestamps["donation_completed"]
+                            ? "Donation marked completed."
+                            : "Not yet completed.")}
+                        {s === "fulfilled" &&
+                          (request.status === "fulfilled"
+                            ? "Request closed."
+                            : "Request still open.")}
                       </p>
                     </div>
                   </li>
                 );
               })}
             </ol>
+
+            {confirmedDonor && confirmedAlert && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/50 p-3">
+                <BloodTag group={confirmedDonor.bloodGroup} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{confirmedDonor.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {confirmedAlert.score}/100 match · {confirmedAlert.distanceLabel}
+                  </p>
+                </div>
+                <Chip tone="success">Confirmed donor</Chip>
+              </div>
+            )}
+
+            {isOwner && request.status !== "cancelled" && nextAction && (
+              <div className="rounded-lg border border-dashed border-border p-3">
+                <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                  Demo tracking controls — prototype only, not GPS or medical confirmation
+                </p>
+                <Button
+                  onClick={() => {
+                    if (nextAction.stage === "fulfilled") {
+                      setRequestStatus(request.id, "fulfilled");
+                      toast.success("Request marked fulfilled");
+                      return;
+                    }
+                    const ok = markTracking(request.id, nextAction.stage);
+                    if (!ok) toast.error("That step isn't available right now.");
+                    else
+                      toast.success(
+                        nextAction.stage === "en_route"
+                          ? "Donor marked en route"
+                          : "Donation marked completed",
+                      );
+                  }}
+                >
+                  {nextAction.label}
+                </Button>
+              </div>
+            )}
+
             {request.status === "cancelled" && (
               <Chip tone="neutral">This request was cancelled.</Chip>
             )}
+          </Card>
+
+          <Card className="gap-3 p-6 shadow-soft">
+            <h2 className="font-display text-2xl">Emergency activity</h2>
+            <ol className="space-y-2">
+              {activity.map((e, i) => (
+                <li key={`${e.at}-${i}`} className="flex flex-wrap gap-x-3 text-sm">
+                  <span className="w-20 shrink-0 text-muted-foreground">
+                    {new Date(e.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                  </span>
+                  <span className="min-w-0 flex-1 break-words">{e.label}</span>
+                </li>
+              ))}
+            </ol>
           </Card>
 
           <Card className="gap-4 p-6 shadow-soft">

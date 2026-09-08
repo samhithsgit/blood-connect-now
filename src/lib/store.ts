@@ -43,6 +43,23 @@ export interface EmergencyAlert {
   primaryReason: string;
 }
 
+/** A single demo tracking event ("Emergency activity" log entry). */
+export interface TrackingEvent {
+  at: string;
+  label: string;
+}
+
+/**
+ * Local/demo live-tracking record for one request. Stages are derived from the
+ * existing request status + alerts; only the manual demo transitions
+ * (en route / donation completed) are stored as an override.
+ */
+export interface TrackingRecord {
+  override: "en_route" | "donation_completed" | null;
+  timestamps: Partial<Record<string, string>>;
+  events: TrackingEvent[];
+}
+
 interface AppState {
   user: AppUser | null;
   donors: Donor[];
@@ -50,10 +67,12 @@ interface AppState {
   /** requestId -> donorIds the seeker has personally invited */
   invites: Record<string, string[]>;
   alerts: EmergencyAlert[];
+  /** requestId -> demo tracking record */
+  tracking: Record<string, TrackingRecord>;
   nextRequestNumber: number;
 }
 
-const STORAGE_KEY = "bloodbridge.state.v2";
+const STORAGE_KEY = "bloodbridge.state.v3";
 
 function initialState(): AppState {
   return {
@@ -62,7 +81,32 @@ function initialState(): AppState {
     requests: DEMO_REQUESTS,
     invites: {},
     alerts: [],
+    tracking: {},
     nextRequestNumber: 1043,
+  };
+}
+
+export const EMPTY_TRACKING: TrackingRecord = { override: null, timestamps: {}, events: [] };
+
+function withTracking(
+  s: AppState,
+  requestId: string,
+  patch: (rec: TrackingRecord) => TrackingRecord,
+): Record<string, TrackingRecord> {
+  const rec = s.tracking[requestId] ?? { override: null, timestamps: {}, events: [] };
+  return { ...s.tracking, [requestId]: patch(rec) };
+}
+
+function stamp(
+  rec: TrackingRecord,
+  stage: string,
+  label: string,
+  at = new Date().toISOString(),
+): TrackingRecord {
+  return {
+    ...rec,
+    timestamps: { ...rec.timestamps, [stage]: rec.timestamps[stage] ?? at },
+    events: [...rec.events, { at, label }],
   };
 }
 
@@ -127,6 +171,7 @@ export const useDonors = () => useAppState((s) => s.donors);
 export const useRequests = () => useAppState((s) => s.requests);
 export const useInvites = () => useAppState((s) => s.invites);
 export const useAlerts = () => useAppState((s) => s.alerts);
+export const useTracking = () => useAppState((s) => s.tracking);
 
 
 export function currentUser() {
@@ -259,6 +304,10 @@ export function createRequest(input: NewRequestInput): BloodRequest {
   setState((s) => ({
     ...s,
     requests: [request, ...s.requests],
+    tracking: withTracking(s, id, (rec) => {
+      const withCreated = stamp(rec, "created", "Emergency request created", request.createdAt);
+      return stamp(withCreated, "matching", "Smart Match Engine ranked compatible donors", request.createdAt);
+    }),
     nextRequestNumber: s.nextRequestNumber + 1,
   }));
   return request;
@@ -296,12 +345,17 @@ export function inviteDonor(requestId: string, donorId: string) {
 }
 
 export function acceptRequest(requestId: string, donorId: string) {
+  const now = new Date().toISOString();
+  const donorName = state.donors.find((d) => d.id === donorId)?.name ?? "A donor";
   setState((s) => ({
     ...s,
     alerts: s.alerts.map((a) =>
       a.requestId === requestId && a.donorId === donorId && a.response === "pending"
-        ? { ...a, response: "accepted", respondedAt: new Date().toISOString() }
+        ? { ...a, response: "accepted", respondedAt: now }
         : a,
+    ),
+    tracking: withTracking(s, requestId, (rec) =>
+      stamp(rec, "confirmed", `${donorName} accepted the emergency`, now),
     ),
     requests: s.requests.map((r) =>
       r.id === requestId
@@ -353,6 +407,9 @@ export function createEmergencyAlerts(requestId: string, inputs: EmergencyAlertI
   setState((s) => ({
     ...s,
     alerts: [...created, ...s.alerts],
+    tracking: withTracking(s, requestId, (rec) =>
+      stamp(rec, "alerted", `${created.length} compatible donor(s) alerted`, now),
+    ),
     requests: s.requests.map((r) =>
       r.id === requestId
         ? {
@@ -375,9 +432,15 @@ export function respondToAlert(alertId: string, response: "accepted" | "declined
   const request = state.requests.find((r) => r.id === alert.requestId);
   if (!request || request.status === "cancelled") return false;
   const now = new Date().toISOString();
+  const donorName = state.donors.find((d) => d.id === alert.donorId)?.name ?? "A donor";
   setState((s) => ({
     ...s,
     alerts: s.alerts.map((a) => (a.id === alertId ? { ...a, response, respondedAt: now } : a)),
+    tracking: withTracking(s, alert.requestId, (rec) =>
+      response === "accepted"
+        ? stamp(rec, "confirmed", `${donorName} accepted the emergency`, now)
+        : { ...rec, events: [...rec.events, { at: now, label: `${donorName} declined` }] },
+    ),
     requests:
       response === "accepted"
         ? s.requests.map((r) =>
@@ -416,8 +479,48 @@ export function setRequestStatus(requestId: string, status: RequestStatus) {
   setState((s) => ({
     ...s,
     requests: s.requests.map((r) => (r.id === requestId ? { ...r, status } : r)),
+    tracking:
+      status === "fulfilled"
+        ? withTracking(s, requestId, (rec) => stamp(rec, "fulfilled", "Request fulfilled"))
+        : status === "cancelled"
+          ? withTracking(s, requestId, (rec) => stamp(rec, "cancelled", "Request cancelled"))
+          : s.tracking,
   }));
 }
+
+/* ----------------------------- live tracking ------------------------------ */
+
+/**
+ * Demo tracking transition (prototype simulation — no GPS, no medical
+ * verification). Returns false when the transition is not valid right now.
+ */
+export function markTracking(
+  requestId: string,
+  stage: "en_route" | "donation_completed",
+): boolean {
+  const request = state.requests.find((r) => r.id === requestId);
+  if (!request || request.status === "fulfilled" || request.status === "cancelled") return false;
+  const rec = state.tracking[requestId];
+  const current = rec?.override ?? null;
+  if (stage === "en_route") {
+    if (current !== null) return false;
+    if (request.acceptedDonorIds.length === 0) return false;
+  } else if (current !== "en_route") return false;
+
+  setState((s) => ({
+    ...s,
+    tracking: withTracking(s, requestId, (r) => ({
+      ...stamp(
+        r,
+        stage,
+        stage === "en_route" ? "Donor marked En Route" : "Donation marked completed",
+      ),
+      override: stage,
+    })),
+  }));
+  return true;
+}
+
 
 export function resetDemoData() {
   const user = state.user;
