@@ -171,6 +171,7 @@ export const useDonors = () => useAppState((s) => s.donors);
 export const useRequests = () => useAppState((s) => s.requests);
 export const useInvites = () => useAppState((s) => s.invites);
 export const useAlerts = () => useAppState((s) => s.alerts);
+export const useTracking = () => useAppState((s) => s.tracking);
 
 
 export function currentUser() {
