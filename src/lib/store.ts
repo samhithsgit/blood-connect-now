@@ -460,8 +460,48 @@ export function setRequestStatus(requestId: string, status: RequestStatus) {
   setState((s) => ({
     ...s,
     requests: s.requests.map((r) => (r.id === requestId ? { ...r, status } : r)),
+    tracking:
+      status === "fulfilled"
+        ? withTracking(s, requestId, (rec) => stamp(rec, "fulfilled", "Request fulfilled"))
+        : status === "cancelled"
+          ? withTracking(s, requestId, (rec) => stamp(rec, "cancelled", "Request cancelled"))
+          : s.tracking,
   }));
 }
+
+/* ----------------------------- live tracking ------------------------------ */
+
+/**
+ * Demo tracking transition (prototype simulation — no GPS, no medical
+ * verification). Returns false when the transition is not valid right now.
+ */
+export function markTracking(
+  requestId: string,
+  stage: "en_route" | "donation_completed",
+): boolean {
+  const request = state.requests.find((r) => r.id === requestId);
+  if (!request || request.status === "fulfilled" || request.status === "cancelled") return false;
+  const rec = state.tracking[requestId];
+  const current = rec?.override ?? null;
+  if (stage === "en_route") {
+    if (current !== null) return false;
+    if (request.acceptedDonorIds.length === 0) return false;
+  } else if (current !== "en_route") return false;
+
+  setState((s) => ({
+    ...s,
+    tracking: withTracking(s, requestId, (r) => ({
+      ...stamp(
+        r,
+        stage,
+        stage === "en_route" ? "Donor marked En Route" : "Donation marked completed",
+      ),
+      override: stage,
+    })),
+  }));
+  return true;
+}
+
 
 export function resetDemoData() {
   const user = state.user;
