@@ -419,9 +419,15 @@ export function respondToAlert(alertId: string, response: "accepted" | "declined
   const request = state.requests.find((r) => r.id === alert.requestId);
   if (!request || request.status === "cancelled") return false;
   const now = new Date().toISOString();
+  const donorName = state.donors.find((d) => d.id === alert.donorId)?.name ?? "A donor";
   setState((s) => ({
     ...s,
     alerts: s.alerts.map((a) => (a.id === alertId ? { ...a, response, respondedAt: now } : a)),
+    tracking: withTracking(s, alert.requestId, (rec) =>
+      response === "accepted"
+        ? stamp(rec, "confirmed", `${donorName} accepted the emergency`, now)
+        : { ...rec, events: [...rec.events, { at: now, label: `${donorName} declined` }] },
+    ),
     requests:
       response === "accepted"
         ? s.requests.map((r) =>
