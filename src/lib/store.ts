@@ -303,6 +303,10 @@ export function createRequest(input: NewRequestInput): BloodRequest {
   setState((s) => ({
     ...s,
     requests: [request, ...s.requests],
+    tracking: withTracking(s, id, (rec) => {
+      const withCreated = stamp(rec, "created", "Emergency request created", request.createdAt);
+      return stamp(withCreated, "matching", "Smart Match Engine ranked compatible donors", request.createdAt);
+    }),
     nextRequestNumber: s.nextRequestNumber + 1,
   }));
   return request;
