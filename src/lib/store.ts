@@ -43,6 +43,23 @@ export interface EmergencyAlert {
   primaryReason: string;
 }
 
+/** A single demo tracking event ("Emergency activity" log entry). */
+export interface TrackingEvent {
+  at: string;
+  label: string;
+}
+
+/**
+ * Local/demo live-tracking record for one request. Stages are derived from the
+ * existing request status + alerts; only the manual demo transitions
+ * (en route / donation completed) are stored as an override.
+ */
+export interface TrackingRecord {
+  override: "en_route" | "donation_completed" | null;
+  timestamps: Partial<Record<string, string>>;
+  events: TrackingEvent[];
+}
+
 interface AppState {
   user: AppUser | null;
   donors: Donor[];
@@ -50,10 +67,12 @@ interface AppState {
   /** requestId -> donorIds the seeker has personally invited */
   invites: Record<string, string[]>;
   alerts: EmergencyAlert[];
+  /** requestId -> demo tracking record */
+  tracking: Record<string, TrackingRecord>;
   nextRequestNumber: number;
 }
 
-const STORAGE_KEY = "bloodbridge.state.v2";
+const STORAGE_KEY = "bloodbridge.state.v3";
 
 function initialState(): AppState {
   return {
@@ -62,7 +81,32 @@ function initialState(): AppState {
     requests: DEMO_REQUESTS,
     invites: {},
     alerts: [],
+    tracking: {},
     nextRequestNumber: 1043,
+  };
+}
+
+export const EMPTY_TRACKING: TrackingRecord = { override: null, timestamps: {}, events: [] };
+
+function withTracking(
+  s: AppState,
+  requestId: string,
+  patch: (rec: TrackingRecord) => TrackingRecord,
+): Record<string, TrackingRecord> {
+  const rec = s.tracking[requestId] ?? { override: null, timestamps: {}, events: [] };
+  return { ...s.tracking, [requestId]: patch(rec) };
+}
+
+function stamp(
+  rec: TrackingRecord,
+  stage: string,
+  label: string,
+  at = new Date().toISOString(),
+): TrackingRecord {
+  return {
+    ...rec,
+    timestamps: { ...rec.timestamps, [stage]: rec.timestamps[stage] ?? at },
+    events: [...rec.events, { at, label }],
   };
 }
 
