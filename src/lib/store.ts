@@ -340,12 +340,17 @@ export function inviteDonor(requestId: string, donorId: string) {
 }
 
 export function acceptRequest(requestId: string, donorId: string) {
+  const now = new Date().toISOString();
+  const donorName = state.donors.find((d) => d.id === donorId)?.name ?? "A donor";
   setState((s) => ({
     ...s,
     alerts: s.alerts.map((a) =>
       a.requestId === requestId && a.donorId === donorId && a.response === "pending"
-        ? { ...a, response: "accepted", respondedAt: new Date().toISOString() }
+        ? { ...a, response: "accepted", respondedAt: now }
         : a,
+    ),
+    tracking: withTracking(s, requestId, (rec) =>
+      stamp(rec, "confirmed", `${donorName} accepted the emergency`, now),
     ),
     requests: s.requests.map((r) =>
       r.id === requestId
