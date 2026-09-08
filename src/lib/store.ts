@@ -397,6 +397,9 @@ export function createEmergencyAlerts(requestId: string, inputs: EmergencyAlertI
   setState((s) => ({
     ...s,
     alerts: [...created, ...s.alerts],
+    tracking: withTracking(s, requestId, (rec) =>
+      stamp(rec, "alerted", `${created.length} compatible donor(s) alerted`, now),
+    ),
     requests: s.requests.map((r) =>
       r.id === requestId
         ? {
