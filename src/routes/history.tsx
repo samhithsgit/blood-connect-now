@@ -7,7 +7,14 @@ import { PageHeader, EmptyState } from "@/components/bb/page";
 import { RequireAuth } from "@/components/bb/require-auth";
 import { BloodTag, Chip, StatusChip, UrgencyChip } from "@/components/bb/badges";
 import type { BloodRequest } from "@/lib/demo-data";
-import { useRequests, useUser } from "@/lib/store";
+import {
+  useAlerts,
+  useRequests,
+  useTracking,
+  useUser,
+  EMPTY_TRACKING,
+} from "@/lib/store";
+import { deriveStage, TRACKING_BADGE } from "@/lib/tracking";
 
 export const Route = createFileRoute("/history")({
   head: () => ({
