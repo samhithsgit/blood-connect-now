@@ -355,7 +355,7 @@ function RequestDetail() {
               </div>
             )}
 
-            {isOwner && request.status !== "cancelled" && nextAction && (
+            {canTrack && !closed && nextAction && (
               <div className="rounded-lg border border-dashed border-border p-3">
                 <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
                   Demo tracking controls — prototype only, not GPS or medical confirmation
