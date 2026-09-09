@@ -17,19 +17,28 @@ import {
   REQUEST_STATUS_LABEL,
 } from "@/components/bb/badges";
 import { RADIUS_OPTIONS } from "@/lib/blood";
-import type { RequestStatus } from "@/lib/demo-data";
 import { matchDonors, MATCH_WEIGHTS, type DonorMatch } from "@/lib/matching";
+import {
+  TRACKING_STAGES,
+  TRACKING_LABEL,
+  deriveStage,
+  nextSeekerAction,
+  stageIndex,
+} from "@/lib/tracking";
 import {
   acceptRequest,
   createEmergencyAlerts,
   inviteDonor,
+  markTracking,
   setRequestStatus,
   summarizeAlerts,
   useAlerts,
   useDonors,
   useInvites,
   useRequests,
+  useTracking,
   useUser,
+  EMPTY_TRACKING,
 } from "@/lib/store";
 import {
   Dialog,
@@ -60,7 +69,7 @@ export const Route = createFileRoute("/request/$id")({
   component: RequestDetailRoute,
 });
 
-const TIMELINE: RequestStatus[] = ["searching", "notified", "accepted", "fulfilled"];
+
 
 function RequestDetailRoute() {
   return (
