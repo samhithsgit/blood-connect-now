@@ -18,13 +18,17 @@ import { canDonate, evaluateEligibility, formatDistance, haversineKm } from "@/l
 import type { BloodRequest } from "@/lib/demo-data";
 import {
   acceptRequest,
+  markTracking,
   respondToAlert,
   setDonorAvailability,
   useAlerts,
   useDonors,
   useRequests,
+  useTracking,
   useUser,
+  EMPTY_TRACKING,
 } from "@/lib/store";
+import { deriveStage, TRACKING_BADGE } from "@/lib/tracking";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -213,7 +217,7 @@ function DonorDashboard() {
           <h2 className="mt-10 font-display text-2xl">Requests you accepted</h2>
           <div className="mt-4 grid gap-3">
             {accepted.map((r) => (
-              <RequestRow key={r.id} request={r} />
+              <RequestRow key={r.id} request={r} donorId={donor.id} />
             ))}
           </div>
         </>
@@ -423,7 +427,29 @@ function SeekerDashboard() {
   );
 }
 
-export function RequestRow({ request }: { request: BloodRequest }) {
+export function RequestRow({
+  request,
+  donorId,
+}: {
+  request: BloodRequest;
+  /** When set, shows the donor-side demo tracking actions for this donor. */
+  donorId?: string;
+}) {
+  const alerts = useAlerts();
+  const tracking = useTracking();
+  const donors = useDonors();
+  const stage = deriveStage(request, alerts, tracking[request.id] ?? EMPTY_TRACKING);
+  const confirmedDonor = donors.find((d) => request.acceptedDonorIds.includes(d.id));
+  const closed = request.status === "fulfilled" || request.status === "cancelled";
+  const donorStep =
+    stage === "confirmed"
+      ? ({ stage: "en_route", label: "Mark En Route" } as const)
+      : stage === "en_route"
+        ? ({ stage: "donation_completed", label: "Mark Donation Completed" } as const)
+        : null;
+  const showDonorActions =
+    !!donorId && !closed && !!donorStep && request.acceptedDonorIds.includes(donorId);
+
   return (
     <Card className="gap-3 p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
@@ -436,11 +462,29 @@ export function RequestRow({ request }: { request: BloodRequest }) {
           <p className="mt-1 text-xs text-muted-foreground">
             Raised {new Date(request.createdAt).toLocaleString()}
           </p>
+          {confirmedDonor && (
+            <p className="mt-1 truncate text-xs font-semibold text-primary">
+              Confirmed donor: {confirmedDonor.name}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Chip tone="neutral">{TRACKING_BADGE[stage]}</Chip>
         <UrgencyChip urgency={request.urgency} />
         <StatusChip status={request.status} />
+        {showDonorActions && (
+          <Button
+            size="sm"
+            onClick={() => {
+              const ok = markTracking(request.id, donorStep.stage);
+              if (!ok) toast.error("That step isn't available right now.");
+              else toast.success(`${donorStep.label} — demo tracking updated`);
+            }}
+          >
+            {donorStep.label}
+          </Button>
+        )}
         <Button asChild size="sm" variant="outline">
           <Link to="/request/$id" params={{ id: request.id }}>
             Track

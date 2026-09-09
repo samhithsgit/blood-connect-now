@@ -17,19 +17,28 @@ import {
   REQUEST_STATUS_LABEL,
 } from "@/components/bb/badges";
 import { RADIUS_OPTIONS } from "@/lib/blood";
-import type { RequestStatus } from "@/lib/demo-data";
 import { matchDonors, MATCH_WEIGHTS, type DonorMatch } from "@/lib/matching";
+import {
+  TRACKING_STAGES,
+  TRACKING_LABEL,
+  deriveStage,
+  nextSeekerAction,
+  stageIndex,
+} from "@/lib/tracking";
 import {
   acceptRequest,
   createEmergencyAlerts,
   inviteDonor,
+  markTracking,
   setRequestStatus,
   summarizeAlerts,
   useAlerts,
   useDonors,
   useInvites,
   useRequests,
+  useTracking,
   useUser,
+  EMPTY_TRACKING,
 } from "@/lib/store";
 import {
   Dialog,
@@ -60,7 +69,7 @@ export const Route = createFileRoute("/request/$id")({
   component: RequestDetailRoute,
 });
 
-const TIMELINE: RequestStatus[] = ["searching", "notified", "accepted", "fulfilled"];
+
 
 function RequestDetailRoute() {
   return (
@@ -79,6 +88,7 @@ function RequestDetail() {
   const [radius, setRadius] = useState<number>(10);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const alerts = useAlerts();
+  const tracking = useTracking();
 
 
   const request = requests.find((r) => r.id.toLowerCase() === id.toLowerCase());
@@ -120,7 +130,24 @@ function RequestDetail() {
   const closed = request.status === "fulfilled" || request.status === "cancelled";
   const acceptedDonors = donors.filter((d) => request.acceptedDonorIds.includes(d.id));
   const invited = invites[request.id] ?? [];
-  const stageIndex = TIMELINE.indexOf(request.status);
+
+  /* ------------------- live tracking (local demo, no GPS) ------------------ */
+  const track = tracking[request.id] ?? EMPTY_TRACKING;
+  const currentStage = deriveStage(request, alerts, track);
+  const currentIndex = stageIndex(currentStage);
+  const confirmedDonor = donors.find((d) => request.acceptedDonorIds.includes(d.id)) ?? null;
+  /** Smart Match snapshot taken when the donor was alerted — never recomputed. */
+  const confirmedAlert = confirmedDonor
+    ? (alerts.find((a) => a.requestId === request.id && a.donorId === confirmedDonor.id) ?? null)
+    : null;
+  const nextAction = nextSeekerAction(currentStage);
+  const canTrack =
+    isOwner || (iAccepted && nextAction?.stage !== "fulfilled");
+  const activity =
+    track.events.length > 0
+      ? track.events
+      : [{ at: request.createdAt, label: "Emergency request created" }];
+
 
   /** Alert candidates come straight from the Smart Match Engine ranking. */
   const alertCandidates = matches.filter(
@@ -328,7 +355,7 @@ function RequestDetail() {
               </div>
             )}
 
-            {isOwner && request.status !== "cancelled" && nextAction && (
+            {canTrack && !closed && nextAction && (
               <div className="rounded-lg border border-dashed border-border p-3">
                 <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
                   Demo tracking controls — prototype only, not GPS or medical confirmation

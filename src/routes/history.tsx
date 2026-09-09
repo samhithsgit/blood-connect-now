@@ -7,7 +7,14 @@ import { PageHeader, EmptyState } from "@/components/bb/page";
 import { RequireAuth } from "@/components/bb/require-auth";
 import { BloodTag, Chip, StatusChip, UrgencyChip } from "@/components/bb/badges";
 import type { BloodRequest } from "@/lib/demo-data";
-import { useRequests, useUser } from "@/lib/store";
+import {
+  useAlerts,
+  useRequests,
+  useTracking,
+  useUser,
+  EMPTY_TRACKING,
+} from "@/lib/store";
+import { deriveStage, TRACKING_BADGE } from "@/lib/tracking";
 
 export const Route = createFileRoute("/history")({
   head: () => ({
@@ -45,6 +52,11 @@ function formatDate(iso: string) {
 }
 
 function RequestRow({ request, note }: { request: BloodRequest; note?: string }) {
+  const alerts = useAlerts();
+  const tracking = useTracking();
+  const track = tracking[request.id] ?? EMPTY_TRACKING;
+  const stage = deriveStage(request, alerts, track);
+  const completedAt = track.timestamps["donation_completed"] ?? track.timestamps["fulfilled"];
   return (
     <Card className="gap-3 p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -61,6 +73,7 @@ function RequestRow({ request, note }: { request: BloodRequest; note?: string })
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Chip tone="neutral">{TRACKING_BADGE[stage]}</Chip>
           <StatusChip status={request.status} />
           <UrgencyChip urgency={request.urgency} />
         </div>
@@ -75,6 +88,12 @@ function RequestRow({ request, note }: { request: BloodRequest; note?: string })
         <span>Needed by {formatDate(request.requiredBy)}</span>
         <span aria-hidden>·</span>
         <span className="font-mono">{request.id}</span>
+        {completedAt && (
+          <>
+            <span aria-hidden>·</span>
+            <span>Completed {formatDate(completedAt)}</span>
+          </>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
