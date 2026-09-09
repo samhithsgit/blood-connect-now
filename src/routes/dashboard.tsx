@@ -217,7 +217,7 @@ function DonorDashboard() {
           <h2 className="mt-10 font-display text-2xl">Requests you accepted</h2>
           <div className="mt-4 grid gap-3">
             {accepted.map((r) => (
-              <RequestRow key={r.id} request={r} />
+              <RequestRow key={r.id} request={r} donorId={donor.id} />
             ))}
           </div>
         </>

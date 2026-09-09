@@ -45,6 +45,11 @@ function formatDate(iso: string) {
 }
 
 function RequestRow({ request, note }: { request: BloodRequest; note?: string }) {
+  const alerts = useAlerts();
+  const tracking = useTracking();
+  const track = tracking[request.id] ?? EMPTY_TRACKING;
+  const stage = deriveStage(request, alerts, track);
+  const completedAt = track.timestamps["donation_completed"] ?? track.timestamps["fulfilled"];
   return (
     <Card className="gap-3 p-5 shadow-soft">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -61,6 +66,7 @@ function RequestRow({ request, note }: { request: BloodRequest; note?: string })
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Chip tone="neutral">{TRACKING_BADGE[stage]}</Chip>
           <StatusChip status={request.status} />
           <UrgencyChip urgency={request.urgency} />
         </div>
