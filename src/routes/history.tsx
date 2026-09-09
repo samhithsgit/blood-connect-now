@@ -88,6 +88,12 @@ function RequestRow({ request, note }: { request: BloodRequest; note?: string })
         <span>Needed by {formatDate(request.requiredBy)}</span>
         <span aria-hidden>·</span>
         <span className="font-mono">{request.id}</span>
+        {completedAt && (
+          <>
+            <span aria-hidden>·</span>
+            <span>Completed {formatDate(completedAt)}</span>
+          </>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
