@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { PageHeader, EmptyState } from "@/components/bb/page";
 import { RequireAuth } from "@/components/bb/require-auth";
 import { DonorCard } from "@/components/bb/donor-card";
+import { EmergencyMap } from "@/components/bb/emergency-map";
+
 import {
   AvailabilityChip,
   BloodTag,
@@ -140,7 +142,21 @@ function RequestDetail() {
   const confirmedAlert = confirmedDonor
     ? (alerts.find((a) => a.requestId === request.id && a.donorId === confirmedDonor.id) ?? null)
     : null;
+  /** Smart Match Engine result for the confirmed donor — reused, never recomputed differently. */
+  const confirmedMatch = confirmedDonor
+    ? (matches.find((m) => m.donor.id === confirmedDonor.id) ?? null)
+    : null;
+  const mapCandidates = matches.slice(0, 6).map((m) => ({
+    id: m.donor.id,
+    name: m.donor.name,
+    bloodGroup: m.donor.bloodGroup,
+    lat: m.donor.lat,
+    lng: m.donor.lng,
+    distanceLabel: m.distanceLabel,
+    score: Math.round(m.score),
+  }));
   const nextAction = nextSeekerAction(currentStage);
+
   const canTrack =
     isOwner || (iAccepted && nextAction?.stage !== "fulfilled");
   const activity =
@@ -263,6 +279,18 @@ function RequestDetail() {
               <Chip tone="neutral">Live emergency tracking — prototype simulation</Chip>
             </div>
 
+            <EmergencyMap
+              request={request}
+              stage={currentStage}
+              confirmedDonor={confirmedDonor}
+              confirmedScore={confirmedAlert ? confirmedAlert.score : (confirmedMatch ? Math.round(confirmedMatch.score) : null)}
+              confirmedDistanceLabel={
+                confirmedAlert?.distanceLabel ?? confirmedMatch?.distanceLabel ?? null
+              }
+              candidates={mapCandidates}
+            />
+
+
             <ol className="space-y-1">
               {TRACKING_STAGES.map((s) => {
                 const idx = stageIndex(s);
@@ -342,18 +370,74 @@ function RequestDetail() {
               })}
             </ol>
 
-            {confirmedDonor && confirmedAlert && (
-              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/50 p-3">
-                <BloodTag group={confirmedDonor.bloodGroup} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{confirmedDonor.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {confirmedAlert.score}/100 match · {confirmedAlert.distanceLabel}
-                  </p>
+            {confirmedDonor && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <BloodTag group={confirmedDonor.bloodGroup} />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-primary">
+                        Confirmed donor
+                      </p>
+                      <p className="truncate text-lg font-bold">{confirmedDonor.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {confirmedDonor.area}
+                        {confirmedAlert ? ` · ${confirmedAlert.distanceLabel}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  {confirmedAlert && (
+                    <div className="text-right">
+                      <p className="font-display text-3xl text-primary">
+                        {confirmedAlert.score}/100
+                      </p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Match
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <Chip tone="success">Confirmed donor</Chip>
+
+                {confirmedMatch && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <EngineStat
+                      label={`Compatibility /${MATCH_WEIGHTS.compatibility}`}
+                      value={String(confirmedMatch.breakdown.compatibility)}
+                    />
+                    <EngineStat
+                      label={`Proximity /${MATCH_WEIGHTS.proximity}`}
+                      value={String(confirmedMatch.breakdown.proximity)}
+                    />
+                    <EngineStat
+                      label={`Availability /${MATCH_WEIGHTS.availability}`}
+                      value={String(confirmedMatch.breakdown.availability)}
+                    />
+                    <EngineStat
+                      label={`Eligibility /${MATCH_WEIGHTS.eligibility}`}
+                      value={String(confirmedMatch.breakdown.eligibility)}
+                    />
+                  </div>
+                )}
+
+                <p className="mt-3 text-sm font-semibold">Why this donor?</p>
+                <ul className="mt-1 space-y-1.5 text-sm">
+                  {(confirmedAlert?.why?.length
+                    ? confirmedAlert.why
+                    : (confirmedMatch?.why ?? ["Compatible blood group confirmed by the Smart Match Engine"])
+                  ).map((w) => (
+                    <li key={w} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Smart Match score from the original alert — indicative prototype output, not
+                  medically validated.
+                </p>
               </div>
             )}
+
 
             {canTrack && !closed && nextAction && (
               <div className="rounded-lg border border-dashed border-border p-3">
