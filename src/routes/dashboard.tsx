@@ -440,6 +440,11 @@ export function RequestRow({
   const donors = useDonors();
   const stage = deriveStage(request, alerts, tracking[request.id] ?? EMPTY_TRACKING);
   const confirmedDonor = donors.find((d) => request.acceptedDonorIds.includes(d.id));
+  /** Smart Match snapshot from the original alert — never recomputed. */
+  const confirmedAlert = confirmedDonor
+    ? (alerts.find((a) => a.requestId === request.id && a.donorId === confirmedDonor.id) ?? null)
+    : null;
+
   const closed = request.status === "fulfilled" || request.status === "cancelled";
   const donorStep =
     stage === "confirmed"
@@ -465,8 +470,12 @@ export function RequestRow({
           {confirmedDonor && (
             <p className="mt-1 truncate text-xs font-semibold text-primary">
               Confirmed donor: {confirmedDonor.name}
+              {confirmedAlert
+                ? ` · ${confirmedAlert.score}/100 match · ${confirmedAlert.distanceLabel}`
+                : ""}
             </p>
           )}
+
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
