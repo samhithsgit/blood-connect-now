@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { PageHeader, EmptyState } from "@/components/bb/page";
 import { RequireAuth } from "@/components/bb/require-auth";
 import { DonorCard } from "@/components/bb/donor-card";
+import { EmergencyMap } from "@/components/bb/emergency-map";
+
 import {
   AvailabilityChip,
   BloodTag,
@@ -140,7 +142,21 @@ function RequestDetail() {
   const confirmedAlert = confirmedDonor
     ? (alerts.find((a) => a.requestId === request.id && a.donorId === confirmedDonor.id) ?? null)
     : null;
+  /** Smart Match Engine result for the confirmed donor — reused, never recomputed differently. */
+  const confirmedMatch = confirmedDonor
+    ? (matches.find((m) => m.donor.id === confirmedDonor.id) ?? null)
+    : null;
+  const mapCandidates = matches.slice(0, 6).map((m) => ({
+    id: m.donor.id,
+    name: m.donor.name,
+    bloodGroup: m.donor.bloodGroup,
+    lat: m.donor.lat,
+    lng: m.donor.lng,
+    distanceLabel: m.distanceLabel,
+    score: Math.round(m.score),
+  }));
   const nextAction = nextSeekerAction(currentStage);
+
   const canTrack =
     isOwner || (iAccepted && nextAction?.stage !== "fulfilled");
   const activity =
@@ -262,6 +278,18 @@ function RequestDetail() {
               <h2 className="font-display text-2xl">Emergency tracking</h2>
               <Chip tone="neutral">Live emergency tracking — prototype simulation</Chip>
             </div>
+
+            <EmergencyMap
+              request={request}
+              stage={currentStage}
+              confirmedDonor={confirmedDonor}
+              confirmedScore={confirmedAlert ? confirmedAlert.score : (confirmedMatch ? Math.round(confirmedMatch.score) : null)}
+              confirmedDistanceLabel={
+                confirmedAlert?.distanceLabel ?? confirmedMatch?.distanceLabel ?? null
+              }
+              candidates={mapCandidates}
+            />
+
 
             <ol className="space-y-1">
               {TRACKING_STAGES.map((s) => {
