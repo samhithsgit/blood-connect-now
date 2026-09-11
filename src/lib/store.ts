@@ -41,7 +41,29 @@ export interface EmergencyAlert {
   distanceLabel: string;
   why: string[];
   primaryReason: string;
+  /** Set when the alert was created by an expanded (escalated) search. */
+  viaEscalation?: number;
 }
+
+/**
+ * Day 5 — manual emergency escalation record. One row per confirmed
+ * "Escalate Search" action. Never created automatically.
+ */
+export interface EscalationRecord {
+  id: string;
+  requestId: string;
+  previousRadius: number;
+  newRadius: number;
+  newlyFoundCount: number;
+  newlyAlertedCount: number;
+  timestamp: string;
+  escalationNumber: number;
+  status: "completed";
+}
+
+export const BASE_SEARCH_RADIUS_KM = 10;
+export const ESCALATION_STEP_KM = 10;
+export const MAX_ESCALATIONS = 2;
 
 /** A single demo tracking event ("Emergency activity" log entry). */
 export interface TrackingEvent {
@@ -69,6 +91,8 @@ interface AppState {
   alerts: EmergencyAlert[];
   /** requestId -> demo tracking record */
   tracking: Record<string, TrackingRecord>;
+  /** manual search escalations (Day 5) */
+  escalations: EscalationRecord[];
   nextRequestNumber: number;
 }
 
@@ -82,6 +106,7 @@ function initialState(): AppState {
     invites: {},
     alerts: [],
     tracking: {},
+    escalations: [],
     nextRequestNumber: 1043,
   };
 }
