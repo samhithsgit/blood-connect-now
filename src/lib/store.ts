@@ -41,7 +41,29 @@ export interface EmergencyAlert {
   distanceLabel: string;
   why: string[];
   primaryReason: string;
+  /** Set when the alert was created by an expanded (escalated) search. */
+  viaEscalation?: number;
 }
+
+/**
+ * Day 5 — manual emergency escalation record. One row per confirmed
+ * "Escalate Search" action. Never created automatically.
+ */
+export interface EscalationRecord {
+  id: string;
+  requestId: string;
+  previousRadius: number;
+  newRadius: number;
+  newlyFoundCount: number;
+  newlyAlertedCount: number;
+  timestamp: string;
+  escalationNumber: number;
+  status: "completed";
+}
+
+export const BASE_SEARCH_RADIUS_KM = 10;
+export const ESCALATION_STEP_KM = 10;
+export const MAX_ESCALATIONS = 2;
 
 /** A single demo tracking event ("Emergency activity" log entry). */
 export interface TrackingEvent {
@@ -69,6 +91,8 @@ interface AppState {
   alerts: EmergencyAlert[];
   /** requestId -> demo tracking record */
   tracking: Record<string, TrackingRecord>;
+  /** manual search escalations (Day 5) */
+  escalations: EscalationRecord[];
   nextRequestNumber: number;
 }
 
@@ -82,6 +106,7 @@ function initialState(): AppState {
     invites: {},
     alerts: [],
     tracking: {},
+    escalations: [],
     nextRequestNumber: 1043,
   };
 }
@@ -172,6 +197,7 @@ export const useRequests = () => useAppState((s) => s.requests);
 export const useInvites = () => useAppState((s) => s.invites);
 export const useAlerts = () => useAppState((s) => s.alerts);
 export const useTracking = () => useAppState((s) => s.tracking);
+export const useEscalations = () => useAppState((s) => s.escalations);
 
 
 export function currentUser() {
@@ -473,6 +499,145 @@ export function summarizeAlerts(alerts: EmergencyAlert[], requestId: string): Al
     declined: scoped.filter((a) => a.response === "declined").length,
   };
 }
+
+/* --------------------------- emergency escalation -------------------------- */
+
+export function escalationsFor(escalations: EscalationRecord[], requestId: string) {
+  return escalations
+    .filter((e) => e.requestId === requestId)
+    .sort((a, b) => a.escalationNumber - b.escalationNumber);
+}
+
+/** Current geographic search radius for a request (base 10 km, +10 km per escalation). */
+export function currentSearchRadius(escalations: EscalationRecord[], requestId: string): number {
+  const scoped = escalationsFor(escalations, requestId);
+  const last = scoped[scoped.length - 1];
+  return last ? last.newRadius : BASE_SEARCH_RADIUS_KM;
+}
+
+/** Next radius if another escalation is still allowed, otherwise null. */
+export function nextEscalationRadius(escalations: EscalationRecord[], requestId: string): number | null {
+  if (escalationsFor(escalations, requestId).length >= MAX_ESCALATIONS) return null;
+  return currentSearchRadius(escalations, requestId) + ESCALATION_STEP_KM;
+}
+
+export interface EscalationGate {
+  ok: boolean;
+  reason: string | null;
+}
+
+/** Manual escalation is only offered for an active, alerted, unaccepted request. */
+export function canEscalate(
+  request: BloodRequest,
+  alerts: EmergencyAlert[],
+  escalations: EscalationRecord[],
+): EscalationGate {
+  if (request.status === "fulfilled" || request.status === "cancelled")
+    return { ok: false, reason: "This request is closed." };
+  const scoped = alerts.filter((a) => a.requestId === request.id);
+  if (request.acceptedDonorIds.length > 0 || scoped.some((a) => a.response === "accepted"))
+    return { ok: false, reason: "A donor has already accepted this request." };
+  if (scoped.length === 0)
+    return { ok: false, reason: "Alert compatible donors before expanding the search." };
+  if (escalationsFor(escalations, request.id).length >= MAX_ESCALATIONS)
+    return { ok: false, reason: "Maximum search expansion reached." };
+  return { ok: true, reason: null };
+}
+
+export interface EscalateSearchInput {
+  previousRadius: number;
+  newRadius: number;
+  /** compatible donors inside the new radius that were not previously alerted */
+  newlyFoundCount: number;
+  /** Smart Match Engine results to alert (already filtered by the caller). */
+  candidates: EmergencyAlertInput[];
+}
+
+/**
+ * Records a manual escalation and alerts ONLY donors not already alerted for
+ * this request. Alerts use the exact same structure/snapshot as Day 2 alerts.
+ * Returns null when escalation is not allowed right now.
+ */
+export function escalateSearch(requestId: string, input: EscalateSearchInput): EscalationRecord | null {
+  const request = state.requests.find((r) => r.id === requestId);
+  if (!request) return null;
+  if (!canEscalate(request, state.alerts, state.escalations).ok) return null;
+
+  const now = new Date().toISOString();
+  const escalationNumber = escalationsFor(state.escalations, requestId).length + 1;
+  const existing = new Set(
+    state.alerts.filter((a) => a.requestId === requestId).map((a) => a.donorId),
+  );
+  const created: EmergencyAlert[] = input.candidates
+    .filter((i) => !existing.has(i.donorId))
+    .map((i) => ({
+      id: `al-${requestId}-${i.donorId}`,
+      requestId,
+      donorId: i.donorId,
+      createdAt: now,
+      response: "pending",
+      respondedAt: null,
+      score: i.score,
+      distanceKm: i.distanceKm,
+      distanceLabel: i.distanceLabel,
+      why: i.why,
+      primaryReason: i.primaryReason,
+      viaEscalation: escalationNumber,
+    }));
+
+  const record: EscalationRecord = {
+    id: `esc-${requestId}-${escalationNumber}`,
+    requestId,
+    previousRadius: input.previousRadius,
+    newRadius: input.newRadius,
+    newlyFoundCount: input.newlyFoundCount,
+    newlyAlertedCount: created.length,
+    timestamp: now,
+    escalationNumber,
+    status: "completed",
+  };
+
+  setState((s) => ({
+    ...s,
+    alerts: [...created, ...s.alerts],
+    escalations: [...s.escalations, record],
+    tracking: withTracking(s, requestId, (rec) => {
+      const expanded = stamp(
+        rec,
+        `escalated_${escalationNumber}`,
+        `No response — search expanded ${input.previousRadius} km → ${input.newRadius} km`,
+        now,
+      );
+      return {
+        ...expanded,
+        events: [
+          ...expanded.events,
+          {
+            at: now,
+            label:
+              created.length > 0
+                ? `${created.length} additional compatible donor(s) alerted`
+                : `No additional compatible donors found within ${input.newRadius} km`,
+          },
+        ],
+      };
+    }),
+    requests: s.requests.map((r) =>
+      r.id === requestId
+        ? {
+            ...r,
+            status: r.status === "searching" ? "notified" : r.status,
+            notifiedDonorIds: Array.from(
+              new Set([...r.notifiedDonorIds, ...created.map((c) => c.donorId)]),
+            ),
+          }
+        : r,
+    ),
+  }));
+  return record;
+}
+
+
 
 
 export function setRequestStatus(requestId: string, status: RequestStatus) {
